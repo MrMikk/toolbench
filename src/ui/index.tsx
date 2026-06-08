@@ -1,4 +1,5 @@
 import type { ComponentChildren, JSX } from 'preact';
+import { useState } from 'preact/hooks';
 
 type ButtonProps = JSX.IntrinsicElements['button'] & {
   variant?: 'primary' | 'default' | 'ghost';
@@ -14,6 +15,49 @@ export function Button({ variant = 'default', class: cls = '', children, ...rest
 
 export function TextArea({ class: cls = '', ...rest }: JSX.IntrinsicElements['textarea']) {
   return <textarea class={`field textarea ${cls}`} spellcheck={false} {...rest} />;
+}
+
+export function Input({ class: cls = '', ...rest }: JSX.IntrinsicElements['input']) {
+  return <input class={`field ${cls}`} spellcheck={false} autocomplete="off" {...rest} />;
+}
+
+export function Checkbox({
+  label,
+  class: cls = '',
+  ...rest
+}: JSX.IntrinsicElements['input'] & { label: ComponentChildren }) {
+  return (
+    <label class={`checkbox ${cls}`}>
+      <input type="checkbox" {...rest} />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+/** A button that copies `value` to the clipboard and flashes confirmation. */
+export function CopyButton({
+  value,
+  label = 'Copy',
+  variant = 'default',
+  class: cls = '',
+}: {
+  value: string;
+  label?: string;
+  variant?: 'primary' | 'default' | 'ghost';
+  class?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+  return (
+    <Button variant={variant} class={cls} onClick={copy} disabled={!value}>
+      {copied ? 'Copied!' : label}
+    </Button>
+  );
 }
 
 export function Select({ class: cls = '', children, ...rest }: JSX.IntrinsicElements['select']) {
