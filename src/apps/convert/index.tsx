@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppProps } from '../../sdk';
-import { CopyButton, Field, Select, TextArea, Toolbar } from '../../ui';
+import { CopyButton, Field, Select, Toolbar } from '../../ui';
+import { CodeBlock, CodeEditor, type Language } from '../../ui/code';
 import { convert, detect, type Direction } from './logic';
 
 const STORAGE_KEY = 'state';
@@ -56,6 +57,9 @@ export default function ConvertApp({ ctx }: AppProps) {
   }, [input, direction]);
 
   const detected = input.trim() ? detect(input).toUpperCase() : null;
+  const inputLang: Language = input.trim() && detect(input) === 'json' ? 'json' : 'none';
+  const outputLang: Language =
+    result?.ok && /^[[{]/.test(result.output.trim()) ? 'json' : 'none';
 
   return (
     <div class="stack">
@@ -76,20 +80,22 @@ export default function ConvertApp({ ctx }: AppProps) {
 
       <div class="io-grid">
         <Field label="Input">
-          <TextArea
+          <CodeEditor
             class="tall"
+            language={inputLang}
             value={input}
             placeholder='[{"name":"Ada","year":1815}]  — or CSV with a header row'
-            onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
+            onInput={(e) => setInput(e.currentTarget.value)}
           />
         </Field>
         <Field label="Output">
-          <TextArea
-            class={`tall ${result && !result.ok ? 'has-error' : ''}`}
-            readOnly
-            value={result ? (result.ok ? result.output : result.error) : ''}
-            placeholder="Result…"
-          />
+          {result && !result.ok ? (
+            <pre class="code-block tall has-error" style={{ color: 'var(--danger)' }}>
+              {result.error}
+            </pre>
+          ) : (
+            <CodeBlock class="tall" language={outputLang} code={result?.ok ? result.output : ''} />
+          )}
         </Field>
       </div>
 

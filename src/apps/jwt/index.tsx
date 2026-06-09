@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppProps } from '../../sdk';
-import { Button, CopyButton, Field, TextArea, Toolbar } from '../../ui';
+import { Button, CopyButton, Field, Toolbar } from '../../ui';
+import { CodeBlock, CodeEditor } from '../../ui/code';
 import { decodeJwt, isExpired, timeClaims } from './logic';
 
 const STORAGE_KEY = 'state';
@@ -49,11 +50,12 @@ export default function JwtApp({ ctx }: AppProps) {
   return (
     <div class="stack">
       <Field label="Token">
-        <TextArea
+        <CodeEditor
+          language="jwt"
           value={token}
           class={decoded && !decoded.ok ? 'has-error' : ''}
           placeholder="Paste a JWT (header.payload.signature)…"
-          onInput={(e) => setToken((e.target as HTMLTextAreaElement).value)}
+          onInput={(e) => setToken(e.currentTarget.value)}
         />
       </Field>
 
@@ -85,10 +87,10 @@ export default function JwtApp({ ctx }: AppProps) {
 
           <div class="io-grid">
             <Field label="Header">
-              <TextArea readOnly value={JSON.stringify(decoded.jwt.header, null, 2)} />
+              <CodeBlock language="json" code={JSON.stringify(decoded.jwt.header, null, 2)} />
             </Field>
             <Field label="Payload">
-              <TextArea readOnly value={JSON.stringify(decoded.jwt.payload, null, 2)} />
+              <CodeBlock language="json" code={JSON.stringify(decoded.jwt.payload, null, 2)} />
             </Field>
           </div>
 

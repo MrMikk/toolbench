@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppProps } from '../../sdk';
-import { Button, Field, Select, TextArea, Toolbar } from '../../ui';
+import { Button, Field, Select, Toolbar } from '../../ui';
+import { CodeEditor, type Language } from '../../ui/code';
 import {
   INDENT_OPTIONS,
   detectFormat,
@@ -51,6 +52,7 @@ export default function FormatterApp({ ctx }: AppProps) {
 
   const indentUnit = INDENT_OPTIONS.find((o) => o.id === indentId)?.unit ?? '  ';
   const detected = useMemo(() => (input.trim() ? detectFormat(input) : null), [input]);
+  const language: Language = (choice === 'auto' ? detected : choice) === 'xml' ? 'markup' : 'json';
 
   const run = (action: Action) => {
     try {
@@ -94,11 +96,12 @@ export default function FormatterApp({ ctx }: AppProps) {
       </Toolbar>
 
       <Field label="Document">
-        <TextArea
+        <CodeEditor
           class={`tall ${error ? 'has-error' : ''}`}
+          language={language}
           value={input}
           placeholder="Paste JSON or XML…"
-          onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
+          onInput={(e) => setInput(e.currentTarget.value)}
         />
       </Field>
       {error && <p class="error-text">{error}</p>}
