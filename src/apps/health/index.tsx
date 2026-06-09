@@ -325,7 +325,7 @@ export default function HealthApp({ ctx }: AppProps) {
   };
 
   const onCardDragOver = (id: string) => (e: DragEvent) => {
-    if (drag?.type !== 'check') return; // groups only drop on headers
+    if (drag?.type !== 'check') return; // groups are handled by the group container
     e.preventDefault();
     setDropHint({ key: id, pos: edgePosition(e) });
   };
@@ -337,20 +337,31 @@ export default function HealthApp({ ctx }: AppProps) {
     endDrag();
   };
 
+  // The whole group block is the drop target for reordering groups.
   const onGroupDragOver = (name: string) => (e: DragEvent) => {
-    if (!drag) return;
+    if (drag?.type !== 'group') return;
     e.preventDefault();
-    setDropHint({ key: `g:${name}`, pos: drag.type === 'group' ? edgePosition(e) : 'into' });
+    setDropHint({ key: `g:${name}`, pos: edgePosition(e) });
   };
   const onGroupDrop = (name: string) => (e: DragEvent) => {
-    if (!drag) return;
+    if (drag?.type !== 'group') return;
     e.preventDefault();
-    if (drag.type === 'group') {
-      const pos = dropHint?.pos === 'after' ? 'after' : 'before';
-      setChecks((cs) => moveGroupRelative(cs, drag.key.slice(2), name, pos));
-    } else {
-      setChecks((cs) => moveCheckToGroupEnd(cs, drag.key, name));
-    }
+    const pos = dropHint?.pos === 'after' ? 'after' : 'before';
+    setChecks((cs) => moveGroupRelative(cs, drag.key.slice(2), name, pos));
+    endDrag();
+  };
+  // The header is where you drop a check to move it INTO the group.
+  const onHeaderDragOver = (name: string) => (e: DragEvent) => {
+    if (drag?.type !== 'check') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropHint({ key: `gi:${name}`, pos: 'into' });
+  };
+  const onHeaderDrop = (name: string) => (e: DragEvent) => {
+    if (drag?.type !== 'check') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setChecks((cs) => moveCheckToGroupEnd(cs, drag.key, name));
     endDrag();
   };
 
@@ -365,6 +376,17 @@ export default function HealthApp({ ctx }: AppProps) {
       setCurlNote(`Import failed: ${e instanceof Error ? e.message : 'invalid JSON'}`);
     }
   };
+
+  const groupNames = [...new Set(checks.map((c) => c.group).filter((g): g is string => !!g))];
+  const saveDraft = (d: Draft) => {
+    const saved = fromDraft(d);
+    upsert(saved);
+    setDraft(null);
+    void runCheck(saved);
+  };
+  const renderEditor = () =>
+    draft && <Editor draft={draft} setDraft={setDraft} groupNames={groupNames} onSave={() => saveDraft(draft)} />;
+  const isEditingExisting = draft != null && checks.some((c) => c.id === draft.id);
 
   const renderCard = (check: Check) => {
     const res = results[check.id];
@@ -405,31 +427,35 @@ export default function HealthApp({ ctx }: AppProps) {
           </span>
         </div>
 
-        {expanded.has(check.id) && (
-          <div class="check-detail">
-            {check.kind === 'http' && (
-              <p class="note mono">
-                {check.method} {check.url}
-              </p>
-            )}
-            {res?.message && <p class="note">{res.message}</p>}
-            <div class="check-actions">
-              <Button onClick={() => void runCheck(check)} disabled={running.has(check.id)}>
-                Run
-              </Button>
-              <Button variant="ghost" onClick={() => setDraft(toDraft(check))}>
-                Edit
-              </Button>
-              <Checkbox
-                label="Enabled"
-                checked={check.enabled}
-                onChange={(e) => upsert({ ...check, enabled: (e.target as HTMLInputElement).checked })}
-              />
-              <Button variant="ghost" onClick={() => setChecks((cs) => cs.filter((c) => c.id !== check.id))}>
-                Delete
-              </Button>
+        {draft?.id === check.id ? (
+          <div class="check-detail">{renderEditor()}</div>
+        ) : (
+          expanded.has(check.id) && (
+            <div class="check-detail">
+              {check.kind === 'http' && (
+                <p class="note mono">
+                  {check.method} {check.url}
+                </p>
+              )}
+              {res?.message && <p class="note">{res.message}</p>}
+              <div class="check-actions">
+                <Button onClick={() => void runCheck(check)} disabled={running.has(check.id)}>
+                  Run
+                </Button>
+                <Button variant="ghost" onClick={() => setDraft(toDraft(check))}>
+                  Edit
+                </Button>
+                <Checkbox
+                  label="Enabled"
+                  checked={check.enabled}
+                  onChange={(e) => upsert({ ...check, enabled: (e.target as HTMLInputElement).checked })}
+                />
+                <Button variant="ghost" onClick={() => setChecks((cs) => cs.filter((c) => c.id !== check.id))}>
+                  Delete
+                </Button>
+              </div>
             </div>
-          </div>
+          )
         )}
       </div>
     );
@@ -478,6 +504,8 @@ export default function HealthApp({ ctx }: AppProps) {
         </div>
       )}
 
+      {draft && !isEditingExisting && renderEditor()}
+
       {checks.length === 0 && <p class="empty">No checks yet — add one to get started.</p>}
 
       {groupChecks(checks).map((g) => {
@@ -489,19 +517,25 @@ export default function HealthApp({ ctx }: AppProps) {
           .map<Outcome>((c) => (running.has(c.id) ? 'pending' : results[c.id]?.outcome ?? 'pending'));
         const agg = aggregateOutcome(outcomes);
         const isCollapsed = collapsed.has(g.name);
-        const hint = dropHint?.key === `g:${g.name}` ? dropHint.pos : null;
-        const headerDropCls = hint === 'into' ? 'drop-into' : hint ? `drop-${hint}` : '';
+        const gHint = dropHint?.key === `g:${g.name}` ? dropHint.pos : null;
+        const containerDropCls = gHint && gHint !== 'into' ? `drop-${gHint}` : '';
+        const headerDropCls = dropHint?.key === `gi:${g.name}` ? 'drop-into' : '';
         const draggingCls = drag?.type === 'group' && drag.key === `g:${g.name}` ? 'dragging' : '';
         return (
-          <div class={`check-group ${draggingCls}`} key={g.name}>
+          <div
+            class={`check-group ${draggingCls} ${containerDropCls}`}
+            key={g.name}
+            onDragOver={onGroupDragOver(g.name)}
+            onDrop={onGroupDrop(g.name)}
+          >
             <div
               class={`group-header ${headerDropCls}`}
               draggable
               onDragStart={(e) => startDrag(e, 'group', `g:${g.name}`)}
               onDragEnd={endDrag}
               onClick={() => toggleCollapse(g.name)}
-              onDragOver={onGroupDragOver(g.name)}
-              onDrop={onGroupDrop(g.name)}
+              onDragOver={onHeaderDragOver(g.name)}
+              onDrop={onHeaderDrop(g.name)}
             >
               <span class="grip" title="Drag to reorder group">
                 ⠿
@@ -515,20 +549,6 @@ export default function HealthApp({ ctx }: AppProps) {
           </div>
         );
       })}
-
-      {draft && (
-        <Editor
-          draft={draft}
-          setDraft={setDraft}
-          groupNames={[...new Set(checks.map((c) => c.group).filter((g): g is string => !!g))]}
-          onSave={() => {
-            const saved = fromDraft(draft);
-            upsert(saved);
-            setDraft(null);
-            void runCheck(saved);
-          }}
-        />
-      )}
     </div>
   );
 }

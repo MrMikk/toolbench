@@ -738,11 +738,11 @@ kbd {
 }
 /* Insertion line shown while dragging. */
 .check-card.drop-before,
-.group-header.drop-before {
+.check-group.drop-before {
   box-shadow: inset 0 3px 0 var(--accent);
 }
 .check-card.drop-after,
-.group-header.drop-after {
+.check-group.drop-after {
   box-shadow: inset 0 -3px 0 var(--accent);
 }
 .group-header.drop-into {
