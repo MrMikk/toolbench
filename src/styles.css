@@ -640,6 +640,138 @@ kbd {
   border-color: var(--danger);
 }
 
+/* ---------- Health monitor ---------- */
+.health-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.health-spacer {
+  flex: 1;
+}
+.summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.dot-pass,
+.dot-fail,
+.dot-opaque,
+.dot-timeout,
+.dot-error,
+.dot-pending {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 50%;
+  flex: none;
+}
+.dot-pass {
+  background: #16a34a;
+}
+.dot-fail,
+.dot-error {
+  background: var(--danger);
+}
+.dot-opaque,
+.dot-timeout {
+  background: #d97706;
+}
+.dot-pending {
+  background: var(--text-dim);
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.check-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.check-card.disabled {
+  opacity: 0.55;
+}
+.check-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  cursor: pointer;
+}
+.check-main:hover {
+  background: var(--surface-2);
+}
+.status-dot {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.check-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 550;
+  min-width: 0;
+}
+.check-kind {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.05em 0.4em;
+}
+.check-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.check-meta .slow {
+  color: #d97706;
+  font-weight: 600;
+}
+.spark {
+  display: inline-flex;
+  gap: 1px;
+  align-items: center;
+}
+.spark i {
+  width: 4px;
+  height: 14px;
+  border-radius: 1px;
+  display: inline-block;
+}
+.check-detail {
+  padding: 0.3rem 0.9rem 0.9rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.mono {
+  font-family: var(--mono);
+  word-break: break-all;
+}
+
+.editor-panel,
+.io-panel {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background: var(--surface);
+}
+
 /* ---------- Spotlight ---------- */
 .spotlight-overlay {
   position: fixed;

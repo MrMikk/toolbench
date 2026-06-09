@@ -3,8 +3,10 @@ import { useRef } from 'preact/hooks';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-clike';
+import 'prismjs/components/prism-javascript';
 
-export type Language = 'json' | 'markup' | 'jwt' | 'none';
+export type Language = 'json' | 'markup' | 'javascript' | 'jwt' | 'none';
 
 function escapeHtml(s: string): string {
   return s

@@ -126,6 +126,8 @@ const ConvertIcon = svg(
   </>,
 );
 
+const HealthIcon = svg(<path d="M3 12h4l2 5 4-10 2 5h6" />);
+
 /** The single source of truth for registered mini apps. Adding one = add an entry. */
 export const apps: MiniApp[] = [
   {
@@ -218,6 +220,13 @@ export const apps: MiniApp[] = [
     description: 'Convert between JSON arrays and CSV, with auto-detection.',
     icon: ConvertIcon,
     load: () => import('./convert'),
+  },
+  {
+    slug: 'health',
+    title: 'Health Checks',
+    description: 'Monitor web apps with HTTP, curl or JS checks — run on open.',
+    icon: HealthIcon,
+    load: () => import('./health'),
   },
 ];
 
