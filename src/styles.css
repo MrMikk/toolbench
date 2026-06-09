@@ -703,12 +703,78 @@ kbd {
 .check-main {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   padding: 0.7rem 0.9rem;
-  cursor: pointer;
 }
 .check-main:hover {
   background: var(--surface-2);
+}
+.grip {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+  flex: none;
+}
+.grip:active {
+  cursor: grabbing;
+}
+.check-name-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+  display: flex;
+}
+.check-card.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+}
+
+.check-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.check-group > .check-card {
+  border-width: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--surface-2);
+  cursor: pointer;
+  font-weight: 600;
+}
+.group-header.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+}
+.group-caret {
+  color: var(--text-dim);
+  width: 1ch;
+  flex: none;
+}
+.group-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.check-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 .status-dot {
   width: 0.85rem;

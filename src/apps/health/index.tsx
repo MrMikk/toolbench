@@ -3,7 +3,10 @@ import type { AppProps } from '../../sdk';
 import { Button, Checkbox, CopyButton, Field, Input, Select, TextArea, Toolbar } from '../../ui';
 import { CodeEditor } from '../../ui/code';
 import {
+  aggregateOutcome,
   DEFAULT_SLOW_MS,
+  formatBytes,
+  groupChecks,
   newId,
   parseCurl,
   pushHistory,
@@ -23,6 +26,7 @@ import { runJsCheck } from './sandbox';
 
 const CHECKS_KEY = 'checks';
 const HISTORY_KEY = 'history';
+const COLLAPSED_KEY = 'collapsed';
 const METHODS: Method[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
 
 const SEED: Check[] = [
@@ -30,6 +34,7 @@ const SEED: Check[] = [
     id: newId(),
     kind: 'http',
     name: 'GitHub API',
+    group: 'Examples',
     enabled: true,
     method: 'GET',
     url: 'https://api.github.com',
@@ -41,6 +46,7 @@ const SEED: Check[] = [
     id: newId(),
     kind: 'js',
     name: 'GitHub status (JS)',
+    group: 'Examples',
     enabled: true,
     source:
       "async ({ fetch }) => {\n  const res = await fetch('https://api.github.com');\n  const body = await res.json();\n  return { ok: res.status === 200 && !!body.current_user_url, status: res.status };\n}",
@@ -62,6 +68,7 @@ interface HttpDraft {
   id: string;
   kind: 'http';
   name: string;
+  group: string;
   enabled: boolean;
   method: Method;
   url: string;
@@ -78,6 +85,7 @@ interface JsDraft {
   id: string;
   kind: 'js';
   name: string;
+  group: string;
   enabled: boolean;
   source: string;
   timeoutSec: string;
@@ -101,6 +109,7 @@ function emptyHttpDraft(): HttpDraft {
     id: newId(),
     kind: 'http',
     name: '',
+    group: '',
     enabled: true,
     method: 'GET',
     url: '',
@@ -120,6 +129,7 @@ function emptyJsDraft(): JsDraft {
     id: newId(),
     kind: 'js',
     name: '',
+    group: '',
     enabled: true,
     source: 'async ({ fetch }) => {\n  const res = await fetch(\'https://example.com\');\n  return { ok: res.status === 200, status: res.status };\n}',
     timeoutSec: '10',
@@ -128,12 +138,13 @@ function emptyJsDraft(): JsDraft {
 
 function toDraft(check: Check): Draft {
   if (check.kind === 'js') {
-    return { ...emptyJsDraft(), id: check.id, name: check.name, enabled: check.enabled, source: check.source, timeoutSec: String((check.timeoutMs ?? 10000) / 1000) };
+    return { ...emptyJsDraft(), id: check.id, name: check.name, group: check.group ?? '', enabled: check.enabled, source: check.source, timeoutSec: String((check.timeoutMs ?? 10000) / 1000) };
   }
   return {
     ...emptyHttpDraft(),
     id: check.id,
     name: check.name,
+    group: check.group ?? '',
     enabled: check.enabled,
     method: check.method,
     url: check.url,
@@ -150,13 +161,15 @@ function toDraft(check: Check): Draft {
 
 function fromDraft(d: Draft): Check {
   const timeoutMs = Math.max(1, Number(d.timeoutSec) || 10) * 1000;
+  const group = d.group.trim() || undefined;
   if (d.kind === 'js') {
-    return { id: d.id, kind: 'js', name: d.name || 'Untitled', enabled: d.enabled, source: d.source, timeoutMs };
+    return { id: d.id, kind: 'js', name: d.name || 'Untitled', group, enabled: d.enabled, source: d.source, timeoutMs };
   }
   const check: HttpCheck = {
     id: d.id,
     kind: 'http',
     name: d.name || 'Untitled',
+    group,
     enabled: d.enabled,
     method: d.method,
     url: d.url.trim(),
@@ -192,9 +205,12 @@ export default function HealthApp({ ctx }: AppProps) {
   const [history, setHistory] = useState<Record<string, HistoryEntry[]>>({});
   const [running, setRunning] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<Draft | null>(null);
   const [io, setIo] = useState<string | null>(null);
   const [curlNote, setCurlNote] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
   const loaded = useRef(false);
 
   const runCheck = useCallback(async (check: Check) => {
@@ -233,9 +249,11 @@ export default function HealthApp({ ctx }: AppProps) {
     (async () => {
       const savedChecks = await ctx.storage.get<Check[]>(CHECKS_KEY);
       const savedHistory = await ctx.storage.get<Record<string, HistoryEntry[]>>(HISTORY_KEY);
+      const savedCollapsed = await ctx.storage.get<string[]>(COLLAPSED_KEY);
       const initial = savedChecks && savedChecks.length ? savedChecks : SEED;
       setChecks(initial);
       if (savedHistory) setHistory(savedHistory);
+      if (savedCollapsed) setCollapsed(new Set(savedCollapsed));
       loaded.current = true;
       void runList(initial);
     })();
@@ -247,6 +265,9 @@ export default function HealthApp({ ctx }: AppProps) {
   useEffect(() => {
     if (loaded.current) void ctx.storage.set(HISTORY_KEY, history);
   }, [ctx, history]);
+  useEffect(() => {
+    if (loaded.current) void ctx.storage.set(COLLAPSED_KEY, [...collapsed]);
+  }, [ctx, collapsed]);
 
   useEffect(() => {
     ctx.registerCommands([
@@ -274,6 +295,44 @@ export default function HealthApp({ ctx }: AppProps) {
       return n;
     });
 
+  const toggleCollapse = (name: string) =>
+    setCollapsed((s) => {
+      const n = new Set(s);
+      n.has(name) ? n.delete(name) : n.add(name);
+      return n;
+    });
+
+  // Move a dragged check to sit before `targetId`, adopting the target's group.
+  const moveBefore = (id: string | null, targetId: string) => {
+    if (!id || id === targetId) return;
+    setChecks((cs) => {
+      const fromIdx = cs.findIndex((c) => c.id === id);
+      const target = cs.find((c) => c.id === targetId);
+      if (fromIdx === -1 || !target) return cs;
+      const moved = { ...cs[fromIdx], group: target.group } as Check;
+      const without = cs.filter((c) => c.id !== id);
+      const to = without.findIndex((c) => c.id === targetId);
+      without.splice(to, 0, moved);
+      return without;
+    });
+  };
+
+  // Move a dragged check to the end of a named group.
+  const moveToGroup = (id: string | null, group: string) => {
+    if (!id) return;
+    setChecks((cs) => {
+      if (!cs.some((c) => c.id === id)) return cs;
+      const moved = { ...cs.find((c) => c.id === id)!, group: group || undefined } as Check;
+      const without = cs.filter((c) => c.id !== id);
+      let lastIdx = -1;
+      without.forEach((c, i) => {
+        if ((c.group || '') === group) lastIdx = i;
+      });
+      without.splice(lastIdx + 1, 0, moved);
+      return without;
+    });
+  };
+
   const importConfig = () => {
     if (io === null) return;
     try {
@@ -284,6 +343,84 @@ export default function HealthApp({ ctx }: AppProps) {
     } catch (e) {
       setCurlNote(`Import failed: ${e instanceof Error ? e.message : 'invalid JSON'}`);
     }
+  };
+
+  const renderCard = (check: Check) => {
+    const res = results[check.id];
+    const outcome: Outcome = running.has(check.id) ? 'pending' : res?.outcome ?? 'pending';
+    const slow =
+      res?.outcome === 'pass' && res.latencyMs !== undefined && res.latencyMs > (check.slowMs ?? DEFAULT_SLOW_MS);
+    return (
+      <div
+        class={`check-card ${check.enabled ? '' : 'disabled'} ${dragOver === check.id ? 'drag-over' : ''}`}
+        key={check.id}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(check.id);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          moveBefore(dragId, check.id);
+          setDragOver(null);
+        }}
+      >
+        <div class="check-main">
+          <span
+            class="grip"
+            draggable
+            title="Drag to reorder"
+            onDragStart={() => setDragId(check.id)}
+            onDragEnd={() => {
+              setDragId(null);
+              setDragOver(null);
+            }}
+          >
+            ⠿
+          </span>
+          <span class={`status-dot dot-${outcome}`} title={OUTCOME_LABEL[outcome]} />
+          <button class="check-name-btn" onClick={() => toggleExpand(check.id)}>
+            <span class="check-name">
+              {check.name}
+              <span class="check-kind">{check.kind === 'js' ? 'JS' : check.method}</span>
+            </span>
+          </button>
+          <Sparkline history={history[check.id]} />
+          <span class="check-meta">
+            {res?.status !== undefined && <span>HTTP {res.status}</span>}
+            {res?.sizeBytes !== undefined && <span>{formatBytes(res.sizeBytes)}</span>}
+            {res?.latencyMs !== undefined && <span class={slow ? 'slow' : ''}>{res.latencyMs} ms</span>}
+            <span>{OUTCOME_LABEL[outcome]}</span>
+          </span>
+        </div>
+
+        {expanded.has(check.id) && (
+          <div class="check-detail">
+            {check.kind === 'http' && (
+              <p class="note mono">
+                {check.method} {check.url}
+              </p>
+            )}
+            {res?.message && <p class="note">{res.message}</p>}
+            <div class="check-actions">
+              <Button onClick={() => void runCheck(check)} disabled={running.has(check.id)}>
+                Run
+              </Button>
+              <Button variant="ghost" onClick={() => setDraft(toDraft(check))}>
+                Edit
+              </Button>
+              <Checkbox
+                label="Enabled"
+                checked={check.enabled}
+                onChange={(e) => upsert({ ...check, enabled: (e.target as HTMLInputElement).checked })}
+              />
+              <Button variant="ghost" onClick={() => setChecks((cs) => cs.filter((c) => c.id !== check.id))}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -300,7 +437,6 @@ export default function HealthApp({ ctx }: AppProps) {
               <b class="dot-opaque" /> {summary.other}
             </>
           )}
-          <span class="note"> / {summary.total} enabled</span>
         </span>
         <span class="health-spacer" />
         <Button onClick={() => setDraft(emptyHttpDraft())}>+ Add check</Button>
@@ -332,54 +468,36 @@ export default function HealthApp({ ctx }: AppProps) {
 
       {checks.length === 0 && <p class="empty">No checks yet — add one to get started.</p>}
 
-      {checks.map((check) => {
-        const res = results[check.id];
-        const outcome: Outcome = running.has(check.id) ? 'pending' : res?.outcome ?? 'pending';
-        const slow =
-          res?.outcome === 'pass' && res.latencyMs !== undefined && res.latencyMs > (check.slowMs ?? DEFAULT_SLOW_MS);
-        return (
-          <div class={`check-card ${check.enabled ? '' : 'disabled'}`} key={check.id}>
-            <div class="check-main" onClick={() => toggleExpand(check.id)}>
-              <span class={`status-dot dot-${outcome}`} title={OUTCOME_LABEL[outcome]} />
-              <span class="check-name">
-                {check.name}
-                <span class="check-kind">{check.kind === 'js' ? 'JS' : check.method}</span>
-              </span>
-              <Sparkline history={history[check.id]} />
-              <span class="check-meta">
-                {res?.status !== undefined && <span>HTTP {res.status}</span>}
-                {res?.latencyMs !== undefined && <span class={slow ? 'slow' : ''}>{res.latencyMs} ms</span>}
-                <span>{OUTCOME_LABEL[outcome]}</span>
-              </span>
-            </div>
+      {groupChecks(checks).map((g) => {
+        const cards = g.checks.map(renderCard);
+        if (g.name === '') return <div key="__ungrouped">{cards}</div>;
 
-            {expanded.has(check.id) && (
-              <div class="check-detail">
-                {check.kind === 'http' && <p class="note mono">{check.method} {check.url}</p>}
-                {res?.message && <p class="note">{res.message}</p>}
-                <Toolbar>
-                  <Button onClick={() => void runCheck(check)} disabled={running.has(check.id)}>
-                    Run
-                  </Button>
-                  <Button variant="ghost" onClick={() => setDraft(toDraft(check))}>
-                    Edit
-                  </Button>
-                  <Checkbox
-                    label="Enabled"
-                    checked={check.enabled}
-                    onChange={(e) =>
-                      upsert({ ...check, enabled: (e.target as HTMLInputElement).checked })
-                    }
-                  />
-                  <Button
-                    variant="ghost"
-                    onClick={() => setChecks((cs) => cs.filter((c) => c.id !== check.id))}
-                  >
-                    Delete
-                  </Button>
-                </Toolbar>
-              </div>
-            )}
+        const outcomes = g.checks
+          .filter((c) => c.enabled)
+          .map<Outcome>((c) => (running.has(c.id) ? 'pending' : results[c.id]?.outcome ?? 'pending'));
+        const agg = aggregateOutcome(outcomes);
+        const isCollapsed = collapsed.has(g.name);
+        return (
+          <div class="check-group" key={g.name}>
+            <div
+              class={`group-header ${dragOver === `g:${g.name}` ? 'drag-over' : ''}`}
+              onClick={() => toggleCollapse(g.name)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(`g:${g.name}`);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                moveToGroup(dragId, g.name);
+                setDragOver(null);
+              }}
+            >
+              <span class={`status-dot dot-${agg}`} title={OUTCOME_LABEL[agg]} />
+              <span class="group-caret">{isCollapsed ? '▸' : '▾'}</span>
+              <span class="group-name">{g.name}</span>
+              <span class="note">{g.checks.length === 1 ? '1 check' : `${g.checks.length} checks`}</span>
+            </div>
+            {!isCollapsed && cards}
           </div>
         );
       })}
@@ -388,9 +506,10 @@ export default function HealthApp({ ctx }: AppProps) {
         <Editor
           draft={draft}
           setDraft={setDraft}
+          groupNames={[...new Set(checks.map((c) => c.group).filter((g): g is string => !!g))]}
           onSave={() => {
-            upsert(fromDraft(draft));
             const saved = fromDraft(draft);
+            upsert(saved);
             setDraft(null);
             void runCheck(saved);
           }}
@@ -406,10 +525,12 @@ function Editor({
   draft,
   setDraft,
   onSave,
+  groupNames,
 }: {
   draft: Draft;
   setDraft: (d: Draft | null) => void;
   onSave: () => void;
+  groupNames: string[];
 }) {
   const [curlText, setCurlText] = useState(draft.kind === 'http' ? draft.curlText : '');
   const [curlInfo, setCurlInfo] = useState<string | null>(null);
@@ -444,7 +565,8 @@ function Editor({
             value={draft.kind}
             onInput={(e) => {
               const kind = (e.target as HTMLSelectElement).value;
-              setDraft(kind === 'js' ? { ...emptyJsDraft(), id: draft.id, name: draft.name } : { ...emptyHttpDraft(), id: draft.id, name: draft.name });
+              const carry = { id: draft.id, name: draft.name, group: draft.group };
+              setDraft(kind === 'js' ? { ...emptyJsDraft(), ...carry } : { ...emptyHttpDraft(), ...carry });
             }}
           >
             <option value="http">HTTP (form / curl)</option>
@@ -453,6 +575,19 @@ function Editor({
         </Field>
         <Field label="Name">
           <Input value={draft.name} onInput={(e) => set({ name: (e.target as HTMLInputElement).value })} />
+        </Field>
+        <Field label="Group (optional)">
+          <Input
+            value={draft.group}
+            list="health-groups"
+            placeholder="e.g. Production"
+            onInput={(e) => set({ group: (e.target as HTMLInputElement).value })}
+          />
+          <datalist id="health-groups">
+            {groupNames.map((g) => (
+              <option value={g} />
+            ))}
+          </datalist>
         </Field>
         <Field label="Timeout (s)">
           <Input

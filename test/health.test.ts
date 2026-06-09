@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  aggregateOutcome,
   assertBody,
+  byteLength,
   evaluateHttp,
+  formatBytes,
+  groupChecks,
   matchStatus,
   normalizeJsResult,
   parseCurl,
@@ -45,6 +49,35 @@ describe('health: status & body matching', () => {
     expect(evaluateHttp(http({ expect: '200' }), 500, '', 1).outcome).toBe('fail');
     expect(evaluateHttp(http({ bodyMatch: 'xyz', bodyMode: 'contains' }), 200, 'abc', 1).outcome).toBe('fail');
     expect(evaluateHttp(http({ bodyMatch: '(', bodyMode: 'regex' }), 200, 'abc', 1).message).toContain('invalid body regex');
+  });
+
+  it('reports the response size in bytes', () => {
+    expect(evaluateHttp(http(), 200, 'abc', 1).sizeBytes).toBe(3);
+    expect(byteLength('héllo')).toBe(6);
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(2048)).toBe('2.0 kB');
+  });
+});
+
+describe('health: grouping & aggregation', () => {
+  it('aggregates outcomes with failure dominating, then pending, then opaque', () => {
+    expect(aggregateOutcome(['pass', 'pass'])).toBe('pass');
+    expect(aggregateOutcome(['pass', 'fail'])).toBe('fail');
+    expect(aggregateOutcome(['pass', 'pending'])).toBe('pending');
+    expect(aggregateOutcome(['pass', 'opaque'])).toBe('opaque');
+    expect(aggregateOutcome([])).toBe('pending');
+  });
+
+  it('partitions checks by group, preserving order', () => {
+    const checks: Check[] = [
+      http({ id: 'a', group: 'Prod' }),
+      http({ id: 'b' }),
+      http({ id: 'c', group: 'Prod' }),
+    ];
+    const groups = groupChecks(checks);
+    expect(groups.map((g) => g.name)).toEqual(['Prod', '']);
+    expect(groups[0].checks.map((c) => c.id)).toEqual(['a', 'c']);
+    expect(groups[1].checks.map((c) => c.id)).toEqual(['b']);
   });
 });
 

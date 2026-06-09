@@ -7,6 +7,7 @@ export interface HttpCheck {
   id: string;
   kind: 'http';
   name: string;
+  group?: string;
   enabled: boolean;
   method: Method;
   url: string;
@@ -27,6 +28,7 @@ export interface JsCheck {
   id: string;
   kind: 'js';
   name: string;
+  group?: string;
   enabled: boolean;
   source: string;
   timeoutMs?: number;
@@ -39,6 +41,7 @@ export interface CheckResult {
   outcome: Outcome;
   status?: number;
   latencyMs?: number;
+  sizeBytes?: number;
   message?: string;
   at: number;
 }
@@ -107,9 +110,50 @@ export function evaluateHttp(
     outcome: statusOk && bodyOk ? 'pass' : 'fail',
     status,
     latencyMs,
+    sizeBytes: byteLength(body),
     at: Date.now(),
     message: bits.join(' · '),
   };
+}
+
+/** Byte length of a string (UTF-8), for reporting response size. */
+export function byteLength(s: string): number {
+  return typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(s).length : s.length;
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** Roll up several outcomes into one: any failure dominates, else pending, else opaque, else pass. */
+export function aggregateOutcome(outcomes: Outcome[]): Outcome {
+  if (outcomes.length === 0) return 'pending';
+  if (outcomes.some((o) => o === 'fail' || o === 'error' || o === 'timeout')) return 'fail';
+  if (outcomes.some((o) => o === 'pending')) return 'pending';
+  if (outcomes.some((o) => o === 'opaque')) return 'opaque';
+  return 'pass';
+}
+
+export interface CheckGroup {
+  name: string;
+  checks: Check[];
+}
+
+/** Partition checks into groups by their `group` label, preserving array order. '' = ungrouped. */
+export function groupChecks(checks: Check[]): CheckGroup[] {
+  const order: string[] = [];
+  const map = new Map<string, Check[]>();
+  for (const c of checks) {
+    const g = c.group || '';
+    if (!map.has(g)) {
+      map.set(g, []);
+      order.push(g);
+    }
+    map.get(g)!.push(c);
+  }
+  return order.map((name) => ({ name, checks: map.get(name)! }));
 }
 
 /** Normalize whatever a user JS function returned into a CheckResult. */
