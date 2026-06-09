@@ -7,6 +7,9 @@ import {
   formatBytes,
   groupChecks,
   matchStatus,
+  moveCheckRelative,
+  moveCheckToGroupEnd,
+  moveGroupRelative,
   normalizeJsResult,
   parseCurl,
   pushHistory,
@@ -78,6 +81,33 @@ describe('health: grouping & aggregation', () => {
     expect(groups.map((g) => g.name)).toEqual(['Prod', '']);
     expect(groups[0].checks.map((c) => c.id)).toEqual(['a', 'c']);
     expect(groups[1].checks.map((c) => c.id)).toEqual(['b']);
+  });
+});
+
+describe('health: drag reordering', () => {
+  const cs = (): Check[] => [
+    http({ id: 'a', group: 'G1' }),
+    http({ id: 'b', group: 'G1' }),
+    http({ id: 'c', group: 'G2' }),
+    http({ id: 'd' }),
+  ];
+
+  it('moves a check after another, adopting the target group', () => {
+    const r = moveCheckRelative(cs(), 'd', 'a', 'after');
+    expect(r.map((c) => c.id)).toEqual(['a', 'd', 'b', 'c']);
+    expect(r.find((c) => c.id === 'd')!.group).toBe('G1');
+  });
+
+  it('moves a check to the end of a group', () => {
+    const r = moveCheckToGroupEnd(cs(), 'd', 'G2');
+    const ids = r.map((c) => c.id);
+    expect(r.find((c) => c.id === 'd')!.group).toBe('G2');
+    expect(ids.indexOf('d')).toBe(ids.indexOf('c') + 1);
+  });
+
+  it('reorders a whole group, moving its checks as a block', () => {
+    expect(moveGroupRelative(cs(), 'G2', 'G1', 'before').map((c) => c.id)).toEqual(['c', 'a', 'b', 'd']);
+    expect(moveGroupRelative(cs(), 'G1', 'G2', 'after').map((c) => c.id)).toEqual(['c', 'a', 'b', 'd']);
   });
 });
 

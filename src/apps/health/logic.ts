@@ -156,6 +156,67 @@ export function groupChecks(checks: Check[]): CheckGroup[] {
   return order.map((name) => ({ name, checks: map.get(name)! }));
 }
 
+export type DropPosition = 'before' | 'after';
+
+/** Move a dragged check to before/after a target check, adopting the target's group. */
+export function moveCheckRelative(
+  checks: Check[],
+  dragId: string,
+  targetId: string,
+  pos: DropPosition,
+): Check[] {
+  if (dragId === targetId) return checks;
+  const from = checks.find((c) => c.id === dragId);
+  const target = checks.find((c) => c.id === targetId);
+  if (!from || !target) return checks;
+  const moved = { ...from, group: target.group } as Check;
+  const without = checks.filter((c) => c.id !== dragId);
+  let idx = without.findIndex((c) => c.id === targetId);
+  if (pos === 'after') idx += 1;
+  without.splice(idx, 0, moved);
+  return without;
+}
+
+/** Move a dragged check to the end of a named group (or '' for ungrouped). */
+export function moveCheckToGroupEnd(checks: Check[], dragId: string, group: string): Check[] {
+  const from = checks.find((c) => c.id === dragId);
+  if (!from) return checks;
+  const moved = { ...from, group: group || undefined } as Check;
+  const without = checks.filter((c) => c.id !== dragId);
+  let lastIdx = -1;
+  without.forEach((c, i) => {
+    if ((c.group || '') === group) lastIdx = i;
+  });
+  without.splice(lastIdx + 1, 0, moved);
+  return without;
+}
+
+/** Move a whole group (all its checks, as a contiguous block) before/after another group. */
+export function moveGroupRelative(
+  checks: Check[],
+  dragGroup: string,
+  targetGroup: string,
+  pos: DropPosition,
+): Check[] {
+  if (dragGroup === targetGroup) return checks;
+  const block = checks.filter((c) => (c.group || '') === dragGroup);
+  if (block.length === 0) return checks;
+  const rest = checks.filter((c) => (c.group || '') !== dragGroup);
+  let insertIdx: number;
+  if (pos === 'before') {
+    insertIdx = rest.findIndex((c) => (c.group || '') === targetGroup);
+    if (insertIdx === -1) insertIdx = rest.length;
+  } else {
+    let last = -1;
+    rest.forEach((c, i) => {
+      if ((c.group || '') === targetGroup) last = i;
+    });
+    insertIdx = last === -1 ? rest.length : last + 1;
+  }
+  rest.splice(insertIdx, 0, ...block);
+  return rest;
+}
+
 /** Normalize whatever a user JS function returned into a CheckResult. */
 export function normalizeJsResult(raw: unknown, latencyMs?: number): CheckResult {
   if (!raw || typeof raw !== 'object') {

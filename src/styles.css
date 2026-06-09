@@ -705,20 +705,24 @@ kbd {
   align-items: center;
   gap: 0.6rem;
   padding: 0.7rem 0.9rem;
+  cursor: grab;
+}
+.check-main:active {
+  cursor: grabbing;
 }
 .check-main:hover {
   background: var(--surface-2);
 }
 .grip {
-  cursor: grab;
   color: var(--text-dim);
   font-size: 1rem;
   line-height: 1;
   user-select: none;
   flex: none;
 }
-.grip:active {
-  cursor: grabbing;
+.check-card.dragging,
+.check-group.dragging {
+  opacity: 0.4;
 }
 .check-name-btn {
   background: none;
@@ -732,7 +736,16 @@ kbd {
   min-width: 0;
   display: flex;
 }
-.check-card.drag-over {
+/* Insertion line shown while dragging. */
+.check-card.drop-before,
+.group-header.drop-before {
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+.check-card.drop-after,
+.group-header.drop-after {
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.group-header.drop-into {
   outline: 2px dashed var(--accent);
   outline-offset: -3px;
 }
@@ -753,12 +766,11 @@ kbd {
   gap: 0.6rem;
   padding: 0.6rem 0.9rem;
   background: var(--surface-2);
-  cursor: pointer;
+  cursor: grab;
   font-weight: 600;
 }
-.group-header.drag-over {
-  outline: 2px dashed var(--accent);
-  outline-offset: -3px;
+.group-header:active {
+  cursor: grabbing;
 }
 .group-caret {
   color: var(--text-dim);

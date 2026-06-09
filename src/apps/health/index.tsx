@@ -7,6 +7,9 @@ import {
   DEFAULT_SLOW_MS,
   formatBytes,
   groupChecks,
+  moveCheckRelative,
+  moveCheckToGroupEnd,
+  moveGroupRelative,
   newId,
   parseCurl,
   pushHistory,
@@ -15,6 +18,7 @@ import {
   type BodyMode,
   type Check,
   type CheckResult,
+  type DropPosition,
   type FetchMode,
   type HistoryEntry,
   type HttpCheck,
@@ -209,8 +213,8 @@ export default function HealthApp({ ctx }: AppProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [io, setIo] = useState<string | null>(null);
   const [curlNote, setCurlNote] = useState<string | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ type: 'check' | 'group'; key: string } | null>(null);
+  const [dropHint, setDropHint] = useState<{ key: string; pos: DropPosition | 'into' } | null>(null);
   const loaded = useRef(false);
 
   const runCheck = useCallback(async (check: Check) => {
@@ -302,35 +306,52 @@ export default function HealthApp({ ctx }: AppProps) {
       return n;
     });
 
-  // Move a dragged check to sit before `targetId`, adopting the target's group.
-  const moveBefore = (id: string | null, targetId: string) => {
-    if (!id || id === targetId) return;
-    setChecks((cs) => {
-      const fromIdx = cs.findIndex((c) => c.id === id);
-      const target = cs.find((c) => c.id === targetId);
-      if (fromIdx === -1 || !target) return cs;
-      const moved = { ...cs[fromIdx], group: target.group } as Check;
-      const without = cs.filter((c) => c.id !== id);
-      const to = without.findIndex((c) => c.id === targetId);
-      without.splice(to, 0, moved);
-      return without;
-    });
+  // ---- drag & drop ----
+  const startDrag = (e: DragEvent, type: 'check' | 'group', key: string) => {
+    setDrag({ type, key });
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      // Firefox requires data to be set for a drag to start at all.
+      e.dataTransfer.setData('text/plain', key);
+    }
+  };
+  const endDrag = () => {
+    setDrag(null);
+    setDropHint(null);
+  };
+  const edgePosition = (e: DragEvent): DropPosition => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return e.clientY - r.top < r.height / 2 ? 'before' : 'after';
   };
 
-  // Move a dragged check to the end of a named group.
-  const moveToGroup = (id: string | null, group: string) => {
-    if (!id) return;
-    setChecks((cs) => {
-      if (!cs.some((c) => c.id === id)) return cs;
-      const moved = { ...cs.find((c) => c.id === id)!, group: group || undefined } as Check;
-      const without = cs.filter((c) => c.id !== id);
-      let lastIdx = -1;
-      without.forEach((c, i) => {
-        if ((c.group || '') === group) lastIdx = i;
-      });
-      without.splice(lastIdx + 1, 0, moved);
-      return without;
-    });
+  const onCardDragOver = (id: string) => (e: DragEvent) => {
+    if (drag?.type !== 'check') return; // groups only drop on headers
+    e.preventDefault();
+    setDropHint({ key: id, pos: edgePosition(e) });
+  };
+  const onCardDrop = (id: string) => (e: DragEvent) => {
+    if (drag?.type !== 'check') return;
+    e.preventDefault();
+    const pos = dropHint?.key === id && dropHint.pos !== 'into' ? dropHint.pos : 'before';
+    setChecks((cs) => moveCheckRelative(cs, drag.key, id, pos));
+    endDrag();
+  };
+
+  const onGroupDragOver = (name: string) => (e: DragEvent) => {
+    if (!drag) return;
+    e.preventDefault();
+    setDropHint({ key: `g:${name}`, pos: drag.type === 'group' ? edgePosition(e) : 'into' });
+  };
+  const onGroupDrop = (name: string) => (e: DragEvent) => {
+    if (!drag) return;
+    e.preventDefault();
+    if (drag.type === 'group') {
+      const pos = dropHint?.pos === 'after' ? 'after' : 'before';
+      setChecks((cs) => moveGroupRelative(cs, drag.key.slice(2), name, pos));
+    } else {
+      setChecks((cs) => moveCheckToGroupEnd(cs, drag.key, name));
+    }
+    endDrag();
   };
 
   const importConfig = () => {
@@ -350,31 +371,22 @@ export default function HealthApp({ ctx }: AppProps) {
     const outcome: Outcome = running.has(check.id) ? 'pending' : res?.outcome ?? 'pending';
     const slow =
       res?.outcome === 'pass' && res.latencyMs !== undefined && res.latencyMs > (check.slowMs ?? DEFAULT_SLOW_MS);
+    const dropCls = dropHint?.key === check.id && dropHint.pos !== 'into' ? `drop-${dropHint.pos}` : '';
+    const draggingCls = drag?.type === 'check' && drag.key === check.id ? 'dragging' : '';
     return (
       <div
-        class={`check-card ${check.enabled ? '' : 'disabled'} ${dragOver === check.id ? 'drag-over' : ''}`}
+        class={`check-card ${check.enabled ? '' : 'disabled'} ${dropCls} ${draggingCls}`}
         key={check.id}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(check.id);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          moveBefore(dragId, check.id);
-          setDragOver(null);
-        }}
+        onDragOver={onCardDragOver(check.id)}
+        onDrop={onCardDrop(check.id)}
       >
-        <div class="check-main">
-          <span
-            class="grip"
-            draggable
-            title="Drag to reorder"
-            onDragStart={() => setDragId(check.id)}
-            onDragEnd={() => {
-              setDragId(null);
-              setDragOver(null);
-            }}
-          >
+        <div
+          class="check-main"
+          draggable
+          onDragStart={(e) => startDrag(e, 'check', check.id)}
+          onDragEnd={endDrag}
+        >
+          <span class="grip" title="Drag to reorder">
             ⠿
           </span>
           <span class={`status-dot dot-${outcome}`} title={OUTCOME_LABEL[outcome]} />
@@ -477,21 +489,23 @@ export default function HealthApp({ ctx }: AppProps) {
           .map<Outcome>((c) => (running.has(c.id) ? 'pending' : results[c.id]?.outcome ?? 'pending'));
         const agg = aggregateOutcome(outcomes);
         const isCollapsed = collapsed.has(g.name);
+        const hint = dropHint?.key === `g:${g.name}` ? dropHint.pos : null;
+        const headerDropCls = hint === 'into' ? 'drop-into' : hint ? `drop-${hint}` : '';
+        const draggingCls = drag?.type === 'group' && drag.key === `g:${g.name}` ? 'dragging' : '';
         return (
-          <div class="check-group" key={g.name}>
+          <div class={`check-group ${draggingCls}`} key={g.name}>
             <div
-              class={`group-header ${dragOver === `g:${g.name}` ? 'drag-over' : ''}`}
+              class={`group-header ${headerDropCls}`}
+              draggable
+              onDragStart={(e) => startDrag(e, 'group', `g:${g.name}`)}
+              onDragEnd={endDrag}
               onClick={() => toggleCollapse(g.name)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(`g:${g.name}`);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                moveToGroup(dragId, g.name);
-                setDragOver(null);
-              }}
+              onDragOver={onGroupDragOver(g.name)}
+              onDrop={onGroupDrop(g.name)}
             >
+              <span class="grip" title="Drag to reorder group">
+                ⠿
+              </span>
               <span class={`status-dot dot-${agg}`} title={OUTCOME_LABEL[agg]} />
               <span class="group-caret">{isCollapsed ? '▸' : '▾'}</span>
               <span class="group-name">{g.name}</span>
