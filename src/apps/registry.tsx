@@ -140,7 +140,7 @@ export const apps: MiniApp[] = [
   {
     slug: 'formatter',
     title: 'Formatter',
-    description: 'Pretty-print or minify JSON and XML, with auto-detection.',
+    description: 'Beautify many languages (JS, TS, CSS, HTML, YAML, SQL…); minify JSON/XML.',
     icon: FormatterIcon,
     load: () => import('./formatter'),
   },

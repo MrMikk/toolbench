@@ -1,59 +1,70 @@
 import { describe, it, expect } from 'vitest';
-import { detectFormat, process } from '../src/apps/formatter/logic';
+import {
+  beautify,
+  detectLang,
+  highlightFor,
+  isMinifiable,
+  minifyDoc,
+  process,
+  resolveLang,
+} from '../src/apps/formatter/logic';
 
-describe('detectFormat', () => {
-  it('detects JSON objects, arrays, and bare values', () => {
-    expect(detectFormat('{"a":1}')).toBe('json');
-    expect(detectFormat('[1,2]')).toBe('json');
-    expect(detectFormat('  42  ')).toBe('json');
+describe('formatter: detection & language helpers', () => {
+  it('auto-detects JSON and XML, and gives up on others', () => {
+    expect(detectLang('{"a":1}')).toBe('json');
+    expect(detectLang('  [1,2,3] ')).toBe('json');
+    expect(detectLang('<a><b/></a>')).toBe('xml');
+    expect(detectLang('const x = 1')).toBeNull();
+    expect(detectLang('')).toBeNull();
   });
 
-  it('detects XML', () => {
-    expect(detectFormat('<root><a/></root>')).toBe('xml');
+  it('resolveLang honours an explicit choice and throws on undetectable auto', () => {
+    expect(resolveLang('css', 'whatever')).toBe('css');
+    expect(resolveLang('auto', '{"a":1}')).toBe('json');
+    expect(() => resolveLang('auto', 'const x = 1')).toThrow();
   });
 
-  it('returns null for empty or unrecognised input', () => {
-    expect(detectFormat('')).toBeNull();
-    expect(detectFormat('just some prose')).toBeNull();
-  });
-});
-
-describe('process — JSON', () => {
-  it('beautifies with the chosen indent', () => {
-    const out = process('{"a":1,"b":[2]}', 'auto', 'beautify', '  ').output;
-    expect(out).toBe('{\n  "a": 1,\n  "b": [\n    2\n  ]\n}');
+  it('maps languages to a highlight grammar', () => {
+    expect(highlightFor('json')).toBe('json');
+    expect(highlightFor('ts')).toBe('javascript');
+    expect(highlightFor('html')).toBe('markup');
+    expect(highlightFor('sql')).toBe('none');
   });
 
-  it('minifies', () => {
-    expect(process('{\n  "a": 1\n}', 'json', 'minify', '  ').output).toBe('{"a":1}');
-  });
-
-  it('throws on invalid JSON', () => {
-    expect(() => process('{bad}', 'json', 'beautify', '  ')).toThrow();
-  });
-});
-
-describe('process — XML', () => {
-  it('pretty-prints nested elements', () => {
-    const out = process('<a><b>x</b></a>', 'xml', 'beautify', '  ').output;
-    expect(out).toBe('<a>\n  <b>\n    x\n  </b>\n</a>');
-  });
-
-  it('throws on mismatched tags', () => {
-    expect(() => process('<a></b>', 'xml', 'beautify', '  ')).toThrow(/mismatch/i);
-  });
-
-  it('throws on unclosed tags', () => {
-    expect(() => process('<a><b></a>', 'xml', 'beautify', '  ')).toThrow();
-  });
-
-  it('minify collapses inter-tag whitespace', () => {
-    expect(process('<a>\n  <b/>\n</a>', 'xml', 'minify', '  ').output).toBe('<a><b/></a>');
+  it('only marks JSON and XML as minifiable', () => {
+    expect(isMinifiable('json')).toBe(true);
+    expect(isMinifiable('xml')).toBe(true);
+    expect(isMinifiable('css')).toBe(false);
   });
 });
 
-describe('process — auto-detect failure', () => {
-  it('throws a helpful error when the format is unknown', () => {
-    expect(() => process('???', 'auto', 'beautify', '  ')).toThrow(/detect/i);
+describe('formatter: JSON & XML (dependency-free path)', () => {
+  it('beautifies JSON with the chosen indent', async () => {
+    expect(await beautify('{"a":1,"b":[2,3]}', 'json', '  ')).toBe(
+      '{\n  "a": 1,\n  "b": [\n    2,\n    3\n  ]\n}',
+    );
+  });
+
+  it('beautifies XML with nesting', async () => {
+    expect(await beautify('<a><b>x</b></a>', 'xml', '  ')).toBe('<a>\n  <b>\n    x\n  </b>\n</a>');
+  });
+
+  it('minifies JSON and XML', () => {
+    expect(minifyDoc('{ "a": 1 }', 'json')).toBe('{"a":1}');
+    expect(minifyDoc('<a>\n  <b/>\n</a>', 'xml')).toBe('<a><b/></a>');
+  });
+
+  it('refuses to minify non JSON/XML languages', () => {
+    expect(() => minifyDoc('a {}', 'css')).toThrow(/JSON and XML/);
+  });
+
+  it('throws on malformed JSON and mismatched XML', async () => {
+    await expect(beautify('{bad', 'json', '  ')).rejects.toThrow();
+    await expect(beautify('<a></b>', 'xml', '  ')).rejects.toThrow();
+  });
+
+  it('process routes auto-detected input through the right path', async () => {
+    const r = await process('{"a":1}', 'auto', 'minify', '  ');
+    expect(r).toEqual({ lang: 'json', output: '{"a":1}' });
   });
 });

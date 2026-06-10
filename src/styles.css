@@ -604,6 +604,17 @@ kbd {
 .code-editor.tall .code-editor-area {
   min-height: 340px;
 }
+/* Fill the available viewport height (Formatter). The textarea stays resizable. */
+.code-editor.fill .code-editor-pre,
+.code-editor.fill .code-editor-area {
+  min-height: calc(100vh - 16rem);
+}
+@media (max-width: 768px) {
+  .code-editor.fill .code-editor-pre,
+  .code-editor.fill .code-editor-area {
+    min-height: 60vh;
+  }
+}
 .code-editor-pre {
   position: absolute;
   inset: 0;

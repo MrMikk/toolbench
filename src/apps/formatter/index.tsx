@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppProps } from '../../sdk';
-import { Button, Field, Select, Toolbar } from '../../ui';
-import { CodeEditor, type Language } from '../../ui/code';
+import { Button, CopyButton, Field, Select, Toolbar } from '../../ui';
+import { CodeEditor } from '../../ui/code';
 import {
   INDENT_OPTIONS,
-  detectFormat,
+  LANGS,
+  detectLang,
+  highlightFor,
+  isMinifiable,
   process,
+  resolveLang,
   type Action,
   type FormatChoice,
 } from './logic';
@@ -23,7 +27,7 @@ export default function FormatterApp({ ctx }: AppProps) {
   const [indentId, setIndentId] = useState('2');
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -45,45 +49,52 @@ export default function FormatterApp({ ctx }: AppProps) {
   useEffect(() => {
     ctx.registerCommands([
       { id: 'formatter:auto', title: 'Formatter: Auto-detect', run: () => setChoice('auto') },
-      { id: 'formatter:json', title: 'Formatter: JSON', run: () => setChoice('json') },
-      { id: 'formatter:xml', title: 'Formatter: XML', run: () => setChoice('xml') },
+      ...LANGS.map((l) => ({
+        id: `formatter:${l.id}`,
+        title: `Formatter: ${l.label}`,
+        run: () => setChoice(l.id),
+      })),
     ]);
   }, [ctx]);
 
   const indentUnit = INDENT_OPTIONS.find((o) => o.id === indentId)?.unit ?? '  ';
-  const detected = useMemo(() => (input.trim() ? detectFormat(input) : null), [input]);
-  const language: Language = (choice === 'auto' ? detected : choice) === 'xml' ? 'markup' : 'json';
+  const detected = useMemo(() => (input.trim() ? detectLang(input) : null), [input]);
+  const effective = choice === 'auto' ? detected : choice;
+  const language = effective ? highlightFor(effective) : 'none';
+  const canMinify = effective != null && isMinifiable(effective);
 
-  const run = (action: Action) => {
+  const run = async (action: Action) => {
+    setBusy(true);
     try {
-      const { output } = process(input, choice, action, indentUnit);
+      // Resolve eagerly so an undetectable 'auto' fails before we spin up a formatter.
+      resolveLang(choice, input);
+      const { output } = await process(input, choice, action, indentUnit);
       setInput(output);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid input');
+    } finally {
+      setBusy(false);
     }
   };
 
   // Clear the error as soon as the input or chosen format changes.
   useEffect(() => setError(null), [input, choice]);
 
-  const copy = async () => {
-    if (!input) return;
-    await navigator.clipboard.writeText(input);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
-  };
-
   return (
     <div class="stack">
       <Toolbar>
-        <Field label="Format">
+        <Field label="Language">
           <Select
             value={choice}
             onInput={(e) => setChoice((e.target as HTMLSelectElement).value as FormatChoice)}
           >
-            <option value="auto">Auto-detect{detected ? ` (${detected.toUpperCase()})` : ''}</option>
-            <option value="json">JSON</option>
-            <option value="xml">XML</option>
+            <option value="auto">
+              Auto-detect{detected ? ` (${detected.toUpperCase()})` : ''}
+            </option>
+            {LANGS.map((l) => (
+              <option value={l.id}>{l.label}</option>
+            ))}
           </Select>
         </Field>
         <Field label="Indent">
@@ -97,25 +108,27 @@ export default function FormatterApp({ ctx }: AppProps) {
 
       <Field label="Document">
         <CodeEditor
-          class={`tall ${error ? 'has-error' : ''}`}
+          class={`fill ${error ? 'has-error' : ''}`}
           language={language}
           value={input}
-          placeholder="Paste JSON or XML…"
+          placeholder="Paste code or markup…"
           onInput={(e) => setInput(e.currentTarget.value)}
         />
       </Field>
       {error && <p class="error-text">{error}</p>}
 
       <Toolbar>
-        <Button variant="primary" onClick={() => run('beautify')} disabled={!input.trim()}>
-          Beautify
+        <Button variant="primary" onClick={() => void run('beautify')} disabled={!input.trim() || busy}>
+          {busy ? 'Formatting…' : 'Beautify'}
         </Button>
-        <Button onClick={() => run('minify')} disabled={!input.trim()}>
+        <Button
+          onClick={() => void run('minify')}
+          disabled={!input.trim() || busy || !canMinify}
+          title={canMinify ? undefined : 'Minify is available for JSON and XML only'}
+        >
           Minify
         </Button>
-        <Button onClick={copy} disabled={!input}>
-          {copied ? 'Copied!' : 'Copy'}
-        </Button>
+        <CopyButton value={input} />
         <Button onClick={() => setInput('')} disabled={!input}>
           Clear
         </Button>
