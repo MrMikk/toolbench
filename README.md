@@ -8,6 +8,32 @@ spotlight command palette.
 Built with **Vite + Preact + TypeScript**. Installable as a PWA and deployed to
 GitHub Pages.
 
+## The apps
+
+Fourteen tools, all running entirely in your browser — see
+**[docs/apps.md](docs/apps.md)** for full documentation of each.
+
+| App | Slug | Description |
+| --- | --- | --- |
+| Encoder / Decoder | `encoder` | URL, Base64 and HTML-entity encoding and decoding |
+| Formatter | `formatter` | Beautify 16 languages via Prettier/sql-formatter; minify JSON/XML |
+| JWT Inspector | `jwt` | Decode a JWT's header, payload and time claims (no verification) |
+| Hash & HMAC | `hash` | SHA-1/256/384/512 digests and HMACs via Web Crypto |
+| UUID / Token | `uuid` | UUID v4, NanoID, hex tokens and PINs, up to 100 at a time |
+| Timestamp | `time` | Unix ⇄ ISO 8601 ⇄ local ⇄ relative time |
+| Color Converter | `color` | HEX ⇄ RGB ⇄ HSL with WCAG contrast badges |
+| Regex Tester | `regex` | Live matches, capture groups, flags and replace preview |
+| Diff Viewer | `diff` | Minimal line-level diff (LCS) between two texts |
+| Case Converter | `case` | camelCase, snake_case, kebab-case, slugs and 4 more styles |
+| Number Base | `base` | Binary/octal/decimal/hex conversion, BigInt-exact |
+| Cron Explainer | `cron` | Cron expression → English + next 5 run times |
+| JSON ⇄ CSV | `convert` | RFC-4180 conversion both ways, with auto-detection |
+| Health Checks | `health` | HTTP/curl/JS uptime checks with history sparklines |
+
+Every app persists its state per-app to IndexedDB and loads as its own
+code-split chunk. Heavy dependencies (Prettier's language plugins,
+sql-formatter) are imported on first use, not up front.
+
 ## Quick start
 
 ```bash
@@ -26,6 +52,8 @@ src/
   sdk/      the host↔app contract: storage, context, types
   ui/       shared UI primitives
   apps/     mini apps + the registry (single source of truth)
+docs/
+  apps.md   per-app user documentation
 ```
 
 The host stays tiny on purpose. The SDK (`src/sdk`) grows only when a real app
@@ -61,7 +89,9 @@ export default function MyTool({ ctx }: AppProps) {
 2. Add one entry to `apps` in `src/apps/registry.tsx`.
 
 That's it — routing, the launcher card, and spotlight pick it up automatically;
-the shell is never touched.
+the shell is never touched. Keep pure logic in a `logic.ts` beside the
+component and unit-test it in `test/` (every existing app follows this
+pattern). Document the new app in [docs/apps.md](docs/apps.md).
 
 ## Deployment
 
