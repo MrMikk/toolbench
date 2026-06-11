@@ -11,7 +11,7 @@ GitHub Pages.
 
 ## The apps
 
-Fourteen tools, all running entirely in your browser — see
+Fifteen tools, all running entirely in your browser — see
 **[docs/apps.md](docs/apps.md)** for full documentation of each.
 
 | App | Slug | Description |
@@ -30,6 +30,7 @@ Fourteen tools, all running entirely in your browser — see
 | Cron Explainer | `cron` | Cron expression → English + next 5 run times |
 | JSON ⇄ CSV | `convert` | RFC-4180 conversion both ways, with auto-detection |
 | Health Checks | `health` | HTTP/curl/JS uptime checks with history sparklines |
+| Cloud Monitor | `gcloud` | Read-only Cloud Run & Cloud SQL inventory, metrics and logs |
 
 Every app persists its state per-app to IndexedDB and loads as its own
 code-split chunk. Heavy dependencies (Prettier's language plugins,

@@ -1,6 +1,6 @@
 # Mini apps
 
-Toolbench currently ships **14 mini apps**. Everything runs entirely in the
+Toolbench currently ships **15 mini apps**. Everything runs entirely in the
 browser — no requests leave the page except the ones you configure yourself in
 Health Checks. Each app persists its state (inputs, options) to IndexedDB, so
 your work survives reloads, and each app is its own lazily-loaded chunk.
@@ -27,6 +27,7 @@ used** — navigate Home any time to reach the launcher.
 | [Cron Explainer](#cron-explainer) | `cron` | Cron → English + next run times |
 | [JSON ⇄ CSV](#json--csv) | `convert` | Convert between JSON arrays and CSV |
 | [Health Checks](#health-checks) | `health` | HTTP/curl/JS checks with history |
+| [Cloud Monitor](#cloud-monitor) | `gcloud` | Cloud Run & Cloud SQL inventory, metrics, logs |
 
 ---
 
@@ -194,6 +195,52 @@ network requests — only to the endpoints **you** configure.
 - Spotlight commands: *Health: Run all checks*, *Health: Add check*.
 - Note: checks run from your browser, so the target must be reachable from it
   and allow cross-origin requests (CORS) where applicable.
+
+## Cloud Monitor
+
+`/a/gcloud` — A read-only dashboard for **Cloud Run** and **Cloud SQL**:
+resource inventory, key metrics, and recent logs, pulled straight from Google
+Cloud in your browser. Like Health Checks, it makes real network requests —
+only to Google's APIs, authenticated as you.
+
+- **Inventory**: Cloud Run services (per region) via the Run Admin API, and
+  Cloud SQL instances via the SQL Admin API, with status/region/tier/version.
+- **Metrics** (Cloud Monitoring `timeSeries`): for Run — requests, p99 latency,
+  CPU, memory, instance count; for SQL — CPU, memory, disk, connections. Shown
+  as sparklines over a selectable range (1h / 6h / 24h / 7d).
+- **Logs** (Cloud Logging `entries:list`): the most recent entries for the
+  selected resource, filterable by severity.
+
+### How authentication works
+
+Authentication uses **Google Identity Services' browser token model** — a
+client-side OAuth 2.0 flow with **no client secret and no backend**. Nothing is
+proxied through Toolbench: requests go directly from your browser to Google, and
+your access token never leaves the page (it lives in `sessionStorage` for the
+session only, never in IndexedDB).
+
+You bring your **own OAuth Client ID**, so the app talks to *your* project as
+*you*, with read-only scopes. One-time setup:
+
+1. In your GCP project, enable the **Cloud Run Admin, Cloud SQL Admin, Cloud
+   Monitoring, and Cloud Logging** APIs.
+2. Create an **OAuth 2.0 Client ID** of type **Web application**, and add this
+   site's origin (shown on the connect screen) to its *Authorized JavaScript
+   origins*.
+3. Paste the Client ID and your **project ID** into Cloud Monitor and click
+   **Connect**. Choose **Narrow** scopes (`monitoring.read` + `logging.read` +
+   `cloud-platform.read-only`) or **Broad** (`cloud-platform.read-only`) if a
+   call reports a missing scope.
+
+Only the non-secret Client ID, project ID, and your view preferences persist
+locally; the access token does not. **Sign out** revokes and clears it. Tokens
+are short-lived (~1h) — when one expires the app prompts you to **Reconnect**.
+
+- Spotlight commands: *Refresh*, *Sign out*, *Last 1 hour*, *Last 24 hours*.
+- Caveats: Cloud Run is regional with no cheap "list all", so you supply a
+  comma-separated region list. Errors are mapped to actionable messages — an
+  un-enabled API, a missing scope, or a CORS/network failure each say what to
+  fix. Being browser-only, it needs network access and can't run offline.
 
 ---
 

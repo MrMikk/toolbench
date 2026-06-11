@@ -128,6 +128,15 @@ const ConvertIcon = svg(
 
 const HealthIcon = svg(<path d="M3 12h4l2 5 4-10 2 5h6" />);
 
+const CloudIcon = svg(
+  <>
+    <path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 0 1 17 18Z" />
+    <path d="M9 14h.01" />
+    <path d="M12 14h.01" />
+    <path d="M15 14h.01" />
+  </>,
+);
+
 /** The single source of truth for registered mini apps. Adding one = add an entry. */
 export const apps: MiniApp[] = [
   {
@@ -227,6 +236,13 @@ export const apps: MiniApp[] = [
     description: 'Monitor web apps with HTTP, curl or JS checks — run on open.',
     icon: HealthIcon,
     load: () => import('./health'),
+  },
+  {
+    slug: 'gcloud',
+    title: 'Cloud Monitor',
+    description: 'Inventory, metrics and logs for Cloud Run and Cloud SQL — read-only, in your browser.',
+    icon: CloudIcon,
+    load: () => import('./gcloud'),
   },
 ];
 
