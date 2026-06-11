@@ -70,12 +70,22 @@ export interface TokenState {
 const MONITORING_READ = 'https://www.googleapis.com/auth/monitoring.read';
 const LOGGING_READ = 'https://www.googleapis.com/auth/logging.read';
 const CLOUD_PLATFORM_RO = 'https://www.googleapis.com/auth/cloud-platform.read-only';
+const SQLSERVICE_ADMIN = 'https://www.googleapis.com/auth/sqlservice.admin';
+const CLOUD_PLATFORM = 'https://www.googleapis.com/auth/cloud-platform';
 
-/** Read-only scopes. 'narrow' names each service; 'broad' is the single fallback. */
+/**
+ * OAuth scopes. 'narrow' requests the least-privilege scope each API accepts:
+ * monitoring.read + logging.read for metrics/logs, cloud-platform.read-only for
+ * Cloud Run inventory, and sqlservice.admin for Cloud SQL — whose instances.list
+ * does NOT accept cloud-platform.read-only (only cloud-platform or
+ * sqlservice.admin). 'broad' is the single full-access superset, the fallback
+ * when an API still reports an insufficient scope. (Reads are gated by IAM
+ * regardless of the OAuth scope.)
+ */
 export function scopesFor(mode: ScopeMode): string[] {
   return mode === 'broad'
-    ? [CLOUD_PLATFORM_RO]
-    : [MONITORING_READ, LOGGING_READ, CLOUD_PLATFORM_RO];
+    ? [CLOUD_PLATFORM]
+    : [MONITORING_READ, LOGGING_READ, CLOUD_PLATFORM_RO, SQLSERVICE_ADMIN];
 }
 
 export function isExpired(state: TokenState, skewMs = 60_000): boolean {
@@ -392,7 +402,7 @@ export function mapApiError(status: number, body: unknown): ApiErrorInfo {
       return {
         kind: 'scope',
         status,
-        message: message + ' Try signing out and reconnecting with the Broad read-only scope.',
+        message: message + ' Try signing out and reconnecting with the Broad scope.',
       };
     }
     return { kind: 'http', status, message };

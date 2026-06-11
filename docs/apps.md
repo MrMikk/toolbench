@@ -220,7 +220,9 @@ your access token never leaves the page (it lives in `sessionStorage` for the
 session only, never in IndexedDB).
 
 You bring your **own OAuth Client ID**, so the app talks to *your* project as
-*you*, with read-only scopes. One-time setup in the
+*you*. Cloud Monitor only ever issues read (GET/list) calls, and what you can
+read is gated by your IAM role; the OAuth scopes are kept as narrow as each API
+allows (see step 6). One-time setup in the
 [Google Cloud Console](https://console.cloud.google.com/):
 
 1. Select your project.
@@ -235,9 +237,12 @@ You bring your **own OAuth Client ID**, so the app talks to *your* project as
 5. Click **Create**, then copy the Client ID (it ends in
    `.apps.googleusercontent.com`).
 6. Paste the Client ID and your **project ID** into Cloud Monitor and click
-   **Connect**. Choose **Narrow** scopes (`monitoring.read` + `logging.read` +
-   `cloud-platform.read-only`) or **Broad** (`cloud-platform.read-only`) if a
-   call reports a missing scope.
+   **Connect**. Choose **Narrow** — the least-privilege scope each API accepts
+   (`monitoring.read` + `logging.read` + `cloud-platform.read-only` for Cloud
+   Run + `sqlservice.admin` for Cloud SQL, whose `instances.list` does *not*
+   accept the read-only scope) — or **Broad** (full `cloud-platform`) if a call
+   still reports an insufficient scope. (What you can actually read is gated by
+   your IAM role regardless of the OAuth scope.)
 
 The connect screen has the same steps under "How do I create a Client ID?".
 

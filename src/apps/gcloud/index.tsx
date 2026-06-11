@@ -270,8 +270,8 @@ export default function GCloudApp({ ctx }: AppProps) {
               value={settings.scopeMode}
               onInput={(e) => patch({ scopeMode: (e.target as HTMLSelectElement).value as ScopeMode })}
             >
-              <option value="narrow">Narrow (monitoring + logging + read-only)</option>
-              <option value="broad">Broad (cloud-platform read-only)</option>
+              <option value="narrow">Narrow (least privilege per API)</option>
+              <option value="broad">Broad (full cloud-platform)</option>
             </Select>
           </Field>
           <Toolbar>

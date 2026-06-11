@@ -35,10 +35,16 @@ describe('gcloud: time ranges & scopes', () => {
     expect(alignmentPeriodFor('7d')).toBe('3600s');
   });
 
-  it('narrow scopes include monitoring + logging; broad is the single read-only scope', () => {
-    expect(scopesFor('broad')).toEqual(['https://www.googleapis.com/auth/cloud-platform.read-only']);
-    expect(scopesFor('narrow')).toContain('https://www.googleapis.com/auth/monitoring.read');
-    expect(scopesFor('narrow')).toContain('https://www.googleapis.com/auth/logging.read');
+  it('narrow names each API scope (incl. a SQL-capable scope); broad is full cloud-platform', () => {
+    // Cloud SQL instances.list rejects cloud-platform.read-only, so narrow must
+    // carry sqlservice.admin or SQL inventory fails with "insufficient scopes".
+    const narrow = scopesFor('narrow');
+    expect(narrow).toContain('https://www.googleapis.com/auth/monitoring.read');
+    expect(narrow).toContain('https://www.googleapis.com/auth/logging.read');
+    expect(narrow).toContain('https://www.googleapis.com/auth/cloud-platform.read-only');
+    expect(narrow).toContain('https://www.googleapis.com/auth/sqlservice.admin');
+    // Broad must be a true superset so escalating to it actually fixes a scope error.
+    expect(scopesFor('broad')).toEqual(['https://www.googleapis.com/auth/cloud-platform']);
   });
 
   it('isExpired respects the skew window', () => {
