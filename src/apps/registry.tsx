@@ -175,7 +175,7 @@ export const apps: MiniApp[] = [
   {
     slug: 'color',
     title: 'Color Converter',
-    description: 'HEX ⇄ RGB ⇄ HSL with WCAG contrast checking.',
+    description: 'HEX ⇄ RGB ⇄ HSL with a color picker and WCAG contrast checking.',
     icon: ColorIcon,
     load: () => import('./color'),
   },

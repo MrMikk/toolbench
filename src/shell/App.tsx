@@ -1,16 +1,28 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { useRouter } from './router';
 import { useTheme } from './theme';
 import { Nav } from './Nav';
 import { Home } from './Home';
 import { Spotlight } from './Spotlight';
 import { AppHost } from './AppHost';
+import { getLastApp } from './lastApp';
 import { findApp } from '../apps/registry';
 
 export function App() {
-  const { path } = useRouter();
+  const { path, navigate } = useRouter();
   const { theme, toggle } = useTheme();
   const [spotlightOpen, setSpotlightOpen] = useState(false);
+  const redirected = useRef(false);
+
+  // On a fresh load that lands on the launcher, jump to the last opened tool.
+  // Runs once: navigating Home later (or after this) is never overridden.
+  useEffect(() => {
+    if (redirected.current) return;
+    redirected.current = true;
+    if (path !== '/') return;
+    const last = getLastApp();
+    if (last && findApp(last)) navigate(`/a/${last}`, { replace: true });
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

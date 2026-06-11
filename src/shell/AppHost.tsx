@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { useRouter } from './router';
 import { clearDynamicCommands, setDynamicCommands } from './commands';
+import { setLastApp } from './lastApp';
 import { createAppContext } from '../sdk';
 import type { AppProps, MiniApp } from '../sdk';
 
@@ -12,6 +13,7 @@ export function AppHost({ app }: { app: MiniApp }) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    setLastApp(app.slug);
     let cancelled = false;
     setComp(null);
     setFailed(false);

@@ -55,6 +55,15 @@ export default function ColorApp({ ctx }: AppProps) {
             onInput={(e) => setInput((e.target as HTMLInputElement).value)}
           />
         </Field>
+        <Field label="Pick">
+          <input
+            type="color"
+            class="color-picker"
+            aria-label="Pick a color"
+            value={rgb ? rgbToHex(rgb) : '#000000'}
+            onInput={(e) => setInput((e.target as HTMLInputElement).value)}
+          />
+        </Field>
       </Toolbar>
 
       {input.trim() && !rgb && <p class="error-text">Unrecognised color.</p>}

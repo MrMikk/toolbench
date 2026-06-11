@@ -8,7 +8,8 @@ your work survives reloads, and each app is its own lazily-loaded chunk.
 Every app is reachable three ways: the launcher grid on the home screen, a
 direct URL (`/a/<slug>`), and the **⌘K / Ctrl+K spotlight**. Apps marked
 *spotlight commands* below also contribute their own actions to the palette
-while open.
+while open. Reopening the site jumps straight back to the **last tool you
+used** — navigate Home any time to reach the launcher.
 
 | App | Slug | What it does |
 | --- | --- | --- |
@@ -18,7 +19,7 @@ while open.
 | [Hash & HMAC](#hash--hmac) | `hash` | SHA-1/256/384/512 digests and HMACs |
 | [UUID / Token](#uuid--token) | `uuid` | UUIDs, NanoIDs, hex tokens, PINs in bulk |
 | [Timestamp](#timestamp) | `time` | Unix ⇄ ISO 8601 ⇄ local ⇄ relative time |
-| [Color Converter](#color-converter) | `color` | HEX ⇄ RGB ⇄ HSL + WCAG contrast |
+| [Color Converter](#color-converter) | `color` | HEX ⇄ RGB ⇄ HSL, color picker, WCAG contrast |
 | [Regex Tester](#regex-tester) | `regex` | Live matches, groups, replace preview |
 | [Diff Viewer](#diff-viewer) | `diff` | Line-level diff between two texts |
 | [Case Converter](#case-converter) | `case` | camelCase, snake_case, slugs and more |
@@ -108,6 +109,8 @@ while open.
 
 - Accepts `#hex`, `rgb()` and `hsl()` input (e.g. `#0ea5e9`,
   `rgb(14 165 233)`, `hsl(199 89% 48%)`).
+- A native **color picker** sits beside the field: it tracks the current
+  color, and choosing a color fills the input with its hex value.
 - Shows all three notations plus a live swatch.
 - **WCAG contrast ratios** against white and black, with AAA / AA / Fail
   badges computed per the WCAG luminance spec.

@@ -3,7 +3,8 @@
 A client-side **mini-apps platform**: a single shell that hosts small, independent,
 browser-only tools. State lives in the browser (IndexedDB); there is no backend.
 Apps are reachable via the nav, URL slugs (`/a/<slug>`), and a `⌘K` / `Ctrl+K`
-spotlight command palette.
+spotlight command palette. Reopening the site returns you to the last tool you
+used.
 
 Built with **Vite + Preact + TypeScript**. Installable as a PWA and deployed to
 GitHub Pages.
@@ -21,7 +22,7 @@ Fourteen tools, all running entirely in your browser — see
 | Hash & HMAC | `hash` | SHA-1/256/384/512 digests and HMACs via Web Crypto |
 | UUID / Token | `uuid` | UUID v4, NanoID, hex tokens and PINs, up to 100 at a time |
 | Timestamp | `time` | Unix ⇄ ISO 8601 ⇄ local ⇄ relative time |
-| Color Converter | `color` | HEX ⇄ RGB ⇄ HSL with WCAG contrast badges |
+| Color Converter | `color` | HEX ⇄ RGB ⇄ HSL with a color picker and WCAG contrast badges |
 | Regex Tester | `regex` | Live matches, capture groups, flags and replace preview |
 | Diff Viewer | `diff` | Minimal line-level diff (LCS) between two texts |
 | Case Converter | `case` | camelCase, snake_case, kebab-case, slugs and 4 more styles |

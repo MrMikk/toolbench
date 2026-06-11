@@ -449,6 +449,25 @@ kbd {
   border: 1px solid var(--border);
 }
 
+/* Native color input, sized to line up with the text field next to it. */
+.color-picker {
+  width: 48px;
+  height: 38px;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-picker::-webkit-color-swatch,
+.color-picker::-moz-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 3px);
+}
+
 .token-list {
   display: flex;
   flex-direction: column;

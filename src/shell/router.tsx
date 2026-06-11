@@ -21,7 +21,7 @@ export function toHref(path: string): string {
 
 interface RouterValue {
   path: string;
-  navigate: (path: string) => void;
+  navigate: (path: string, opts?: { replace?: boolean }) => void;
 }
 
 const RouterContext = createContext<RouterValue>({ path: '/', navigate: () => {} });
@@ -36,10 +36,12 @@ export function RouterProvider({ children }: { children: ComponentChildren }) {
   }, []);
 
   const navigate = useCallback(
-    (to: string) => {
+    (to: string, opts?: { replace?: boolean }) => {
       const internal = to.startsWith('/') ? to : '/' + to;
       if (internal === path) return;
-      history.pushState(null, '', toHref(internal));
+      const url = toHref(internal);
+      if (opts?.replace) history.replaceState(null, '', url);
+      else history.pushState(null, '', url);
       setPath(internal);
       scrollTo(0, 0);
     },
