@@ -220,17 +220,26 @@ your access token never leaves the page (it lives in `sessionStorage` for the
 session only, never in IndexedDB).
 
 You bring your **own OAuth Client ID**, so the app talks to *your* project as
-*you*, with read-only scopes. One-time setup:
+*you*, with read-only scopes. One-time setup in the
+[Google Cloud Console](https://console.cloud.google.com/):
 
-1. In your GCP project, enable the **Cloud Run Admin, Cloud SQL Admin, Cloud
-   Monitoring, and Cloud Logging** APIs.
-2. Create an **OAuth 2.0 Client ID** of type **Web application**, and add this
-   site's origin (shown on the connect screen) to its *Authorized JavaScript
-   origins*.
-3. Paste the Client ID and your **project ID** into Cloud Monitor and click
+1. Select your project.
+2. **APIs & Services → Library**: enable the **Cloud Run Admin**, **Cloud SQL
+   Admin**, **Cloud Monitoring**, and **Cloud Logging** APIs.
+3. **APIs & Services → OAuth consent screen**: set it up (User type **External**
+   is fine) and add your own Google account as a **test user**.
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID**,
+   Application type **Web application**. Under **Authorized JavaScript origins**,
+   add this site's origin (shown on the connect screen, e.g.
+   `https://mrmikk.github.io`).
+5. Click **Create**, then copy the Client ID (it ends in
+   `.apps.googleusercontent.com`).
+6. Paste the Client ID and your **project ID** into Cloud Monitor and click
    **Connect**. Choose **Narrow** scopes (`monitoring.read` + `logging.read` +
    `cloud-platform.read-only`) or **Broad** (`cloud-platform.read-only`) if a
    call reports a missing scope.
+
+The connect screen has the same steps under "How do I create a Client ID?".
 
 Only the non-secret Client ID, project ID, and your view preferences persist
 locally; the access token does not. **Sign out** revokes and clears it. Tokens

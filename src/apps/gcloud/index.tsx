@@ -214,10 +214,43 @@ export default function GCloudApp({ ctx }: AppProps) {
           <h2>Connect to Google Cloud</h2>
           <p class="note">
             Uses Google sign-in directly from your browser — read-only. Your access token stays in this
-            browser session and is never sent anywhere but Google. Create an OAuth 2.0 <strong>Web</strong>{' '}
-            client in your GCP project, add <code>{location.origin}</code> to its “Authorized JavaScript
-            origins”, then paste its Client ID below.
+            browser session and is never sent anywhere but Google. You bring your own OAuth Client ID, so
+            the app talks to <em>your</em> project as <em>you</em>.
           </p>
+          <details class="gc-guide">
+            <summary>How do I create a Client ID?</summary>
+            <ol>
+              <li>
+                Open the{' '}
+                <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer">
+                  Google Cloud Console
+                </a>{' '}
+                and select your project.
+              </li>
+              <li>
+                Under <strong>APIs &amp; Services → Library</strong>, enable the{' '}
+                <strong>Cloud Run Admin</strong>, <strong>Cloud SQL Admin</strong>,{' '}
+                <strong>Cloud Monitoring</strong>, and <strong>Cloud Logging</strong> APIs.
+              </li>
+              <li>
+                Under <strong>APIs &amp; Services → OAuth consent screen</strong>, set it up (User type{' '}
+                <strong>External</strong> is fine) and add your own Google account as a{' '}
+                <strong>test user</strong>.
+              </li>
+              <li>
+                Under <strong>APIs &amp; Services → Credentials</strong>, choose{' '}
+                <strong>Create credentials → OAuth client ID</strong>, with Application type{' '}
+                <strong>Web application</strong>.
+              </li>
+              <li>
+                In <strong>Authorized JavaScript origins</strong>, add <code>{location.origin}</code>.
+              </li>
+              <li>
+                Click <strong>Create</strong>, then copy the Client ID (it ends in{' '}
+                <code>.apps.googleusercontent.com</code>) and paste it below.
+              </li>
+            </ol>
+          </details>
           <Field label="OAuth Client ID">
             <Input
               value={settings.clientId}
